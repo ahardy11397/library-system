@@ -1,0 +1,57 @@
+# 03_checkout_test.meme -- checkout tests: happy path and all four failure modes.
+
+use calendar
+use catalog
+use patron
+use circulation
+
+test checkout_happy_path:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=2) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    define holds as empty List<Hold>
+    define err as validate_checkout(books, patrons, loans, holds, "978-1", "Alice", 14)
+    assert err is nothing
+
+test checkout_unknown_book_fails:
+    define books as empty List<Book>
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    define holds as empty List<Hold>
+    define err as validate_checkout(books, patrons, loans, holds, "unknown-isbn", "Alice", 14)
+    assert err is not nothing
+
+test checkout_unknown_patron_fails:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=2) to books
+    define patrons as empty List<Patron>
+    define loans as empty List<Loan>
+    define holds as empty List<Hold>
+    define err as validate_checkout(books, patrons, loans, holds, "978-1", "UnknownPatron", 14)
+    assert err is not nothing
+
+test checkout_already_has_isbn_fails:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=2) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    add Loan(isbn="978-1", patron="Alice", loaned_at=1000, due_date=2000) to loans
+    define holds as empty List<Hold>
+    define err as validate_checkout(books, patrons, loans, holds, "978-1", "Alice", 14)
+    assert err is not nothing
+
+test checkout_no_copies_left_fails:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    add Patron(name="Bob", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    add Loan(isbn="978-1", patron="Bob", loaned_at=1000, due_date=2000) to loans
+    define holds as empty List<Hold>
+    define err as validate_checkout(books, patrons, loans, holds, "978-1", "Alice", 14)
+    assert err is not nothing

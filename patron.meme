@@ -1,0 +1,49 @@
+# patron.meme -- patrons, persistence, fine formatting.
+
+record Patron:
+    name: String
+    fines_cents: Int
+
+function load_patrons(path: String) -> List<Patron>:
+    define loaded as read json records Patron from file path or else nothing
+    define result as empty List<Patron>
+    if loaded is not nothing:
+        set result to value of loaded
+    return result
+
+function save_patrons(patrons: List<Patron>, path: String) -> Void:
+    write patrons as json to file path
+
+function find_patron_index(patrons: List<Patron>, name: String) -> Int:
+    define idx as 0 - 1
+    for i from 0 to length of patrons - 1:
+        if patrons[i].name == name:
+            set idx to i
+    return idx
+
+function check_new_patron(patrons: List<Patron>, name: String) -> Optional<String>:
+    if length of string name == 0:
+        return optional "Error: patron name cannot be empty"
+    define idx as find_patron_index(patrons, name)
+    if idx >= 0:
+        define err_msg as "Error: patron already exists: " + name
+        return optional err_msg
+    return nothing
+
+function dollars_text(cents: Int) -> String:
+    define mag as cents
+    define neg as cents < 0
+    if neg:
+        set mag to 0 - cents
+    define whole as mag / 100
+    define rem as mag % 100
+    define rem_text as text of rem
+    if rem < 10:
+        set rem_text to "0" + rem_text
+    define out as text of whole + "." + rem_text
+    if neg:
+        set out to "-" + out
+    return out
+
+function dollars_float_preview(v: Float) -> String:
+    return format v with 2 decimals

@@ -1,0 +1,20 @@
+# 07_calendar_test.meme -- calendar arithmetic tests.
+
+use calendar
+
+test leap_year_rules:
+    assert is_leap_year(2000) == true
+    assert is_leap_year(1900) == false
+    assert is_leap_year(2024) == true
+    assert is_leap_year(2025) == false
+
+test days_in_month_rules:
+    assert days_in_month(2024, 2) == 29
+    assert days_in_month(2025, 2) == 28
+    assert days_in_month(2024, 1) == 31
+    assert days_in_month(2024, 4) == 30
+
+test format_date_fixed_epochs:
+    assert format_date(0) == "1970-01-01"
+    assert format_date(86400 * 31) == "1970-02-01"
+    assert format_date(1700000000) == "2023-11-14"

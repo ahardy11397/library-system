@@ -1,0 +1,69 @@
+# catalog.meme -- books collection, persistence, lookup, and sorting.
+
+record Book:
+    isbn: String
+    title: String
+    author: String
+    copies: Int
+
+function load_books(path: String) -> List<Book>:
+    define loaded as read json records Book from file path or else nothing
+    define result as empty List<Book>
+    if loaded is not nothing:
+        set result to value of loaded
+    return result
+
+function save_books(books: List<Book>, path: String) -> Void:
+    write books as json to file path
+
+function find_book_index(books: List<Book>, wanted_isbn: String) -> Int:
+    define idx as 0 - 1
+    for i from 0 to length of books - 1:
+        if books[i].isbn == wanted_isbn:
+            set idx to i
+    return idx
+
+function check_new_book(books: List<Book>, isbn: String, title: String, author: String, copies: Int) -> Optional<String>:
+    if length of string isbn == 0:
+        return optional "Error: ISBN cannot be empty"
+    if length of string title == 0:
+        return optional "Error: title cannot be empty"
+    if length of string author == 0:
+        return optional "Error: author cannot be empty"
+    if copies < 0:
+        return optional "Error: copies cannot be negative"
+    define idx as find_book_index(books, isbn)
+    if idx >= 0:
+        define err_msg as "Error: book with ISBN already exists: " + isbn
+        return optional err_msg
+    return nothing
+
+function can_delete_book(books: List<Book>, active_loans_count: Int, isbn: String) -> Optional<String>:
+    define idx as find_book_index(books, isbn)
+    if idx < 0:
+        define err_msg as "Error: unknown book: " + isbn
+        return optional err_msg
+    if active_loans_count > 0:
+        define err_msg as "Error: cannot delete book while loans are open: " + isbn
+        return optional err_msg
+    return nothing
+
+function sort_books_by_title(books: List<Book>) -> List<Book>:
+    define out as empty List<Book>
+    for each b in books:
+        add b to out
+    for i from 1 to length of out - 1:
+        define key as out[i]
+        define j as i - 1
+        define shifting as true
+        while shifting:
+            if j < 0:
+                set shifting to false
+            else:
+                if out[j].title > key.title or (out[j].title == key.title and out[j].isbn > key.isbn):
+                    set out[j + 1] to out[j]
+                    subtract 1 from j
+                else:
+                    set shifting to false
+        set out[j + 1] to key
+    return out

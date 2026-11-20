@@ -1,0 +1,221 @@
+# main.meme -- library CLI argv routing.
+# Connects CLI commands to calendar, catalog, patron, and circulation modules.
+
+use calendar
+use catalog
+use patron
+use circulation
+
+function report_error(msg: String) -> Void:
+    append msg + "\n" to file "/dev/stderr"
+
+function print_usage() -> Void:
+    append "Usage:" + "\n" to file "/dev/stderr"
+    append "  library add-book <isbn> <title> <author> <copies>" + "\n" to file "/dev/stderr"
+    append "  library add-patron <patron-name>" + "\n" to file "/dev/stderr"
+    append "  library checkout <isbn> <patron> <days-until-due>" + "\n" to file "/dev/stderr"
+    append "  library return <isbn> <patron>" + "\n" to file "/dev/stderr"
+    append "  library renew <isbn> <patron>" + "\n" to file "/dev/stderr"
+    append "  library hold <isbn> <patron>" + "\n" to file "/dev/stderr"
+    append "  library fines <patron>" + "\n" to file "/dev/stderr"
+    append "  library catalog" + "\n" to file "/dev/stderr"
+    append "  library patron <patron>" + "\n" to file "/dev/stderr"
+
+define books_path as "data/books.json"
+define patrons_path as "data/patrons.json"
+define loans_path as "data/loans.json"
+define holds_path as "data/holds.json"
+
+define books as load_books(books_path)
+define patrons as load_patrons(patrons_path)
+define loans as load_loans(loans_path)
+define holds as load_holds(holds_path)
+define arg_total as argument count
+
+if arg_total < 2:
+    call print_usage()
+    exit with code 1
+
+define cmd as argument 1
+
+if cmd == "add-book":
+    if arg_total != 6:
+        call report_error("usage: library add-book <isbn> <title> <author> <copies>")
+        exit with code 1
+    define isbn as argument 2
+    define title as argument 3
+    define author as argument 4
+    define copies as integer value of argument 5 or else 0 - 1
+    if copies < 0:
+        call report_error("Error: invalid copies count: " + argument 5)
+        exit with code 1
+    define err as check_new_book(books, isbn, title, author, copies)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define b as Book(isbn=isbn, title=title, author=author, copies=copies)
+    add b to books
+    create directory "data"
+    call save_books(books, books_path)
+    print "Added book: " + title + " (" + isbn + ") with " + text of copies + " copies"
+    exit with code 0
+else if cmd == "add-patron":
+    if arg_total != 3:
+        call report_error("usage: library add-patron <patron-name>")
+        exit with code 1
+    define name as argument 2
+    define err as check_new_patron(patrons, name)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define p as Patron(name=name, fines_cents=0)
+    add p to patrons
+    create directory "data"
+    call save_patrons(patrons, patrons_path)
+    print "Added patron: " + name
+    exit with code 0
+else if cmd == "checkout":
+    if arg_total != 5:
+        call report_error("usage: library checkout <isbn> <patron> <days-until-due>")
+        exit with code 1
+    define isbn as argument 2
+    define patron_name as argument 3
+    define days as integer value of argument 4 or else 0
+    define err as validate_checkout(books, patrons, loans, holds, isbn, patron_name, days)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define now as current epoch seconds
+    define due as now + days * 86400
+    define loan as Loan(isbn=isbn, patron=patron_name, loaned_at=now, due_date=due)
+    add loan to loans
+    create directory "data"
+    call save_loans(loans, loans_path)
+    define isbn_holds as holds_for_isbn(holds, isbn)
+    if length of isbn_holds > 0:
+        if patron_name == isbn_holds[0].patron:
+            define new_holds as remove_hold(holds, isbn, patron_name)
+            call save_holds(new_holds, holds_path)
+    print "Checked out " + isbn + " to " + patron_name + " (due " + format_date(due) + ")"
+    exit with code 0
+else if cmd == "return":
+    if arg_total != 4:
+        call report_error("usage: library return <isbn> <patron>")
+        exit with code 1
+    define isbn as argument 2
+    define patron_name as argument 3
+    define err as validate_return(books, patrons, loans, isbn, patron_name)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define l_idx as find_loan_index(loans, isbn, patron_name)
+    define loan as loans[l_idx]
+    define now as current epoch seconds
+    define fine as calculate_overdue_fine(loan.due_date, now)
+    define p_idx as find_patron_index(patrons, patron_name)
+    define cur_p as patrons[p_idx]
+    define updated_p as Patron(name=cur_p.name, fines_cents=cur_p.fines_cents + fine)
+    set patrons[p_idx] to updated_p
+    create directory "data"
+    call save_patrons(patrons, patrons_path)
+    define new_loans as remove_loan(loans, isbn, patron_name)
+    call save_loans(new_loans, loans_path)
+    if fine > 0:
+        print "Returned " + isbn + " from " + patron_name + " with fine $" + dollars_text(fine) + " (new balance $" + dollars_text(patrons[p_idx].fines_cents) + ")"
+    else:
+        print "Returned " + isbn + " from " + patron_name + " with no fine"
+    exit with code 0
+else if cmd == "renew":
+    if arg_total != 4:
+        call report_error("usage: library renew <isbn> <patron>")
+        exit with code 1
+    define isbn as argument 2
+    define patron_name as argument 3
+    define err as validate_renew(books, patrons, loans, holds, isbn, patron_name)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define l_idx as find_loan_index(loans, isbn, patron_name)
+    define cur_l as loans[l_idx]
+    define new_due as cur_l.due_date + 7 * 86400
+    define renewed_l as Loan(isbn=cur_l.isbn, patron=cur_l.patron, loaned_at=cur_l.loaned_at, due_date=new_due)
+    set loans[l_idx] to renewed_l
+    create directory "data"
+    call save_loans(loans, loans_path)
+    print "Renewed " + isbn + " for " + patron_name + " (new due date " + format_date(loans[l_idx].due_date) + ")"
+    exit with code 0
+else if cmd == "hold":
+    if arg_total != 4:
+        call report_error("usage: library hold <isbn> <patron>")
+        exit with code 1
+    define isbn as argument 2
+    define patron_name as argument 3
+    define err as validate_hold(books, patrons, loans, holds, isbn, patron_name)
+    if err is not nothing:
+        call report_error(value of err)
+        exit with code 1
+    define h as Hold(isbn=isbn, patron=patron_name, created_at=current epoch seconds)
+    add h to holds
+    create directory "data"
+    call save_holds(holds, holds_path)
+    define queue_pos as count_holds_for_isbn(holds, isbn)
+    print "Placed hold on " + isbn + " for " + patron_name + " (queue position " + text of queue_pos + ")"
+    exit with code 0
+else if cmd == "fines":
+    if arg_total != 3:
+        call report_error("usage: library fines <patron>")
+        exit with code 1
+    define patron_name as argument 2
+    define p_idx as find_patron_index(patrons, patron_name)
+    if p_idx < 0:
+        call report_error("Error: unknown patron: " + patron_name)
+        exit with code 1
+    define cap_formatted as format 5.0 with 2 decimals
+    print patron_name + " fines: $" + dollars_text(patrons[p_idx].fines_cents) + " (max cap $" + cap_formatted + ")"
+    exit with code 0
+else if cmd == "catalog":
+    if arg_total != 2:
+        call report_error("usage: library catalog")
+        exit with code 1
+    define sorted_books as sort_books_by_title(books)
+    print "Library Catalog (" + text of length of sorted_books + " books):"
+    for each b in sorted_books:
+        define active_loans as count_active_loans_for_isbn(loans, b.isbn)
+        define avail as b.copies - active_loans
+        define holds_cnt as count_holds_for_isbn(holds, b.isbn)
+        define info as "  " + b.title + " by " + b.author + " [ISBN: " + b.isbn + "] - " + text of avail + "/" + text of b.copies + " available"
+        if holds_cnt > 0:
+            set info to info + " (" + text of holds_cnt + " holds)"
+        print info
+    exit with code 0
+else if cmd == "patron":
+    if arg_total != 3:
+        call report_error("usage: library patron <patron>")
+        exit with code 1
+    define patron_name as argument 2
+    define p_idx as find_patron_index(patrons, patron_name)
+    if p_idx < 0:
+        call report_error("Error: unknown patron: " + patron_name)
+        exit with code 1
+    print "Patron: " + patron_name
+    print "Fines balance: $" + dollars_text(patrons[p_idx].fines_cents)
+    define my_loans as patron_loans(loans, patron_name)
+    print "Active loans (" + text of length of my_loans + "):"
+    if length of my_loans == 0:
+        print "  (none)"
+    else:
+        define now as current epoch seconds
+        for each l in my_loans:
+            define b_idx as find_book_index(books, l.isbn)
+            define b_title as "Unknown Title"
+            if b_idx >= 0:
+                set b_title to books[b_idx].title
+            define line as "  - " + b_title + " (" + l.isbn + "), due " + format_date(l.due_date)
+            if now > l.due_date:
+                set line to line + " [OVERDUE]"
+            print line
+    exit with code 0
+else:
+    call report_error("Error: unknown command: " + cmd)
+    call print_usage()
+    exit with code 1

@@ -1,0 +1,43 @@
+# 04_return_and_fines_test.meme -- return tests: on time, overdue, fine cap at $5.00, validation modes.
+
+use calendar
+use catalog
+use patron
+use circulation
+
+test return_on_time_no_fine:
+    define fine as calculate_overdue_fine(1000000, 900000)
+    assert fine == 0
+
+test return_overdue_fixed_epochs:
+    define due as 1000000
+    define now as 1000000 + 5 * 86400
+    define fine as calculate_overdue_fine(due, now)
+    assert fine == 50
+
+test return_fine_capped_at_500_cents:
+    define due as 1000000
+    define now as 1000000 + 60 * 86400
+    define fine as calculate_overdue_fine(due, now)
+    assert fine == 500
+
+test return_validation_modes:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    add Patron(name="Bob", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    add Loan(isbn="978-1", patron="Alice", loaned_at=1000, due_date=2000) to loans
+
+    define err_ok as validate_return(books, patrons, loans, "978-1", "Alice")
+    assert err_ok is nothing
+
+    define err_bad_book as validate_return(books, patrons, loans, "unknown-isbn", "Alice")
+    assert err_bad_book is not nothing
+
+    define err_bad_patron as validate_return(books, patrons, loans, "978-1", "Unknown")
+    assert err_bad_patron is not nothing
+
+    define err_no_loan as validate_return(books, patrons, loans, "978-1", "Bob")
+    assert err_no_loan is not nothing

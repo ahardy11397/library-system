@@ -1,0 +1,79 @@
+# calendar.meme -- civil calendar arithmetic in UTC from epoch seconds.
+# Pure mathematical calendar logic without external libraries.
+
+function is_leap_year(y: Int) -> Bool:
+    if y % 4 != 0:
+        return false
+    if y % 100 != 0:
+        return true
+    if y % 400 == 0:
+        return true
+    return false
+
+function days_in_month(y: Int, m: Int) -> Int:
+    if m == 1 or m == 3 or m == 5 or m == 7 or m == 8 or m == 10 or m == 12:
+        return 31
+    if m == 4 or m == 6 or m == 9 or m == 11:
+        return 30
+    if is_leap_year(y):
+        return 29
+    return 28
+
+function days_before_year(y: Int) -> Int:
+    define days as 0
+    for yy from 1970 to y - 1:
+        if is_leap_year(yy):
+            add 366 to days
+        else:
+            add 365 to days
+    return days
+
+function days_before_month(y: Int, m: Int) -> Int:
+    define days as 0
+    for mm from 1 to m - 1:
+        add days_in_month(y, mm) to days
+    return days
+
+function epoch_to_month_index(e: Int) -> Int:
+    # returns year * 12 + (month - 1) for UTC epoch seconds
+    define days_left as e / 86400
+    define y as 1970
+    define walking_years as true
+    while walking_years:
+        define yd as 365
+        if is_leap_year(y):
+            set yd to 366
+        if days_left >= yd:
+            subtract yd from days_left
+            add 1 to y
+        else:
+            set walking_years to false
+    define m as 1
+    define walking_months as true
+    while walking_months:
+        define md as days_in_month(y, m)
+        if days_left >= md:
+            subtract md from days_left
+            add 1 to m
+        else:
+            set walking_months to false
+    return y * 12 + m - 1
+
+function epoch_to_day(e: Int, year: Int, month: Int) -> Int:
+    define d as e / 86400
+    subtract days_before_year(year) from d
+    subtract days_before_month(year, month) from d
+    add 1 to d
+    return d
+
+function pad2(n: Int) -> String:
+    if n < 10:
+        return "0" + text of n
+    return text of n
+
+function format_date(e: Int) -> String:
+    define mi as epoch_to_month_index(e)
+    define year as mi / 12
+    define month as (mi % 12) + 1
+    define day as epoch_to_day(e, year, month)
+    return text of year + "-" + pad2(month) + "-" + pad2(day)

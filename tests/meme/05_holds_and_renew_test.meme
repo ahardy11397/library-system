@@ -1,0 +1,65 @@
+# 05_holds_and_renew_test.meme -- renew and hold queue tests.
+
+use calendar
+use catalog
+use patron
+use circulation
+
+test renew_happy_path:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    add Loan(isbn="978-1", patron="Alice", loaned_at=1000, due_date=2000) to loans
+    define holds as empty List<Hold>
+    define err as validate_renew(books, patrons, loans, holds, "978-1", "Alice")
+    assert err is nothing
+
+test renew_blocked_by_hold_queue:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    add Patron(name="Bob", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    add Loan(isbn="978-1", patron="Alice", loaned_at=1000, due_date=2000) to loans
+    define holds as empty List<Hold>
+    add Hold(isbn="978-1", patron="Bob", created_at=1500) to holds
+    define err as validate_renew(books, patrons, loans, holds, "978-1", "Alice")
+    assert err is not nothing
+
+test hold_queue_ordering_first_patron_gets_free_copy:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Bob", fines_cents=0) to patrons
+    add Patron(name="Charlie", fines_cents=0) to patrons
+    add Patron(name="Dave", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    define holds as empty List<Hold>
+    add Hold(isbn="978-1", patron="Bob", created_at=1000) to holds
+    add Hold(isbn="978-1", patron="Charlie", created_at=1100) to holds
+
+    # 1 copy available, Bob is first in queue -> Bob can check out
+    define err_bob as validate_checkout(books, patrons, loans, holds, "978-1", "Bob", 7)
+    assert err_bob is nothing
+
+    # Charlie is second in queue -> blocked because 1 copy is reserved for Bob
+    define err_charlie as validate_checkout(books, patrons, loans, holds, "978-1", "Charlie", 7)
+    assert err_charlie is not nothing
+
+    # Dave is not in queue -> blocked
+    define err_dave as validate_checkout(books, patrons, loans, holds, "978-1", "Dave", 7)
+    assert err_dave is not nothing
+
+test hold_duplicate_rejected:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define patrons as empty List<Patron>
+    add Patron(name="Bob", fines_cents=0) to patrons
+    define loans as empty List<Loan>
+    define holds as empty List<Hold>
+    add Hold(isbn="978-1", patron="Bob", created_at=1000) to holds
+    define err as validate_hold(books, patrons, loans, holds, "978-1", "Bob")
+    assert err is not nothing

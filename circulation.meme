@@ -1,0 +1,194 @@
+# circulation.meme -- loans, holds, checkout, return, renewal, and overdue fine business logic.
+
+use calendar
+use catalog
+use patron
+
+record Loan:
+    isbn: String
+    patron: String
+    loaned_at: Int
+    due_date: Int
+
+record Hold:
+    isbn: String
+    patron: String
+    created_at: Int
+
+function load_loans(path: String) -> List<Loan>:
+    define loaded as read json records Loan from file path or else nothing
+    define result as empty List<Loan>
+    if loaded is not nothing:
+        set result to value of loaded
+    return result
+
+function save_loans(loans: List<Loan>, path: String) -> Void:
+    write loans as json to file path
+
+function load_holds(path: String) -> List<Hold>:
+    define loaded as read json records Hold from file path or else nothing
+    define result as empty List<Hold>
+    if loaded is not nothing:
+        set result to value of loaded
+    return result
+
+function save_holds(holds: List<Hold>, path: String) -> Void:
+    write holds as json to file path
+
+function count_active_loans_for_isbn(loans: List<Loan>, isbn: String) -> Int:
+    define count as 0
+    for each l in loans:
+        if l.isbn == isbn:
+            add 1 to count
+    return count
+
+function find_loan_index(loans: List<Loan>, isbn: String, patron: String) -> Int:
+    define idx as 0 - 1
+    for i from 0 to length of loans - 1:
+        if loans[i].isbn == isbn and loans[i].patron == patron:
+            set idx to i
+    return idx
+
+function patron_has_loan(loans: List<Loan>, isbn: String, patron: String) -> Bool:
+    define idx as find_loan_index(loans, isbn, patron)
+    return idx >= 0
+
+function patron_loans(loans: List<Loan>, patron: String) -> List<Loan>:
+    define out as empty List<Loan>
+    for each l in loans:
+        if l.patron == patron:
+            add l to out
+    return out
+
+function holds_for_isbn(holds: List<Hold>, isbn: String) -> List<Hold>:
+    define out as empty List<Hold>
+    for each h in holds:
+        if h.isbn == isbn:
+            add h to out
+    return out
+
+function count_holds_for_isbn(holds: List<Hold>, isbn: String) -> Int:
+    define count as 0
+    for each h in holds:
+        if h.isbn == isbn:
+            add 1 to count
+    return count
+
+function find_hold_index(holds: List<Hold>, isbn: String, patron: String) -> Int:
+    define idx as 0 - 1
+    for i from 0 to length of holds - 1:
+        if holds[i].isbn == isbn and holds[i].patron == patron:
+            set idx to i
+    return idx
+
+function patron_has_hold(holds: List<Hold>, isbn: String, patron: String) -> Bool:
+    define patrons_set as empty set of String
+    for each h in holds:
+        if h.isbn == isbn:
+            add h.patron to set patrons_set
+    return patrons_set contains patron
+
+function calculate_overdue_fine(due_date: Int, current_time: Int) -> Int:
+    if current_time <= due_date:
+        return 0
+    define overdue_seconds as current_time - due_date
+    define overdue_days as overdue_seconds / 86400
+    if overdue_days <= 0:
+        return 0
+    define fine as overdue_days * 10
+    if fine > 500:
+        set fine to 500
+    return fine
+
+function remove_loan(loans: List<Loan>, isbn: String, patron: String) -> List<Loan>:
+    define out as empty List<Loan>
+    for each l in loans:
+        if not (l.isbn == isbn and l.patron == patron):
+            add l to out
+    return out
+
+function remove_hold(holds: List<Hold>, isbn: String, patron: String) -> List<Hold>:
+    define out as empty List<Hold>
+    for each h in holds:
+        if not (h.isbn == isbn and h.patron == patron):
+            add h to out
+    return out
+
+function validate_checkout(books: List<Book>, patrons: List<Patron>, loans: List<Loan>, holds: List<Hold>, isbn: String, patron: String, days: Int) -> Optional<String>:
+    define b_idx as find_book_index(books, isbn)
+    if b_idx < 0:
+        define err_msg as "Error: unknown book: " + isbn
+        return optional err_msg
+    define p_idx as find_patron_index(patrons, patron)
+    if p_idx < 0:
+        define err_msg as "Error: unknown patron: " + patron
+        return optional err_msg
+    if patron_has_loan(loans, isbn, patron):
+        define err_msg as "Error: patron already has that ISBN out: " + patron
+        return optional err_msg
+    if days <= 0:
+        return optional "Error: days until due must be positive"
+    define book as books[b_idx]
+    define active_loans as count_active_loans_for_isbn(loans, isbn)
+    define available_copies as book.copies - active_loans
+    if available_copies <= 0:
+        define err_msg as "Error: no copies left for ISBN: " + isbn
+        return optional err_msg
+    define isbn_holds as holds_for_isbn(holds, isbn)
+    define holds_count as length of isbn_holds
+    if holds_count > 0:
+        define first_hold_patron as isbn_holds[0].patron
+        if patron == first_hold_patron:
+            return nothing
+        if available_copies <= holds_count:
+            define err_msg as "Error: no copies left for ISBN: " + isbn
+            return optional err_msg
+    return nothing
+
+function validate_return(books: List<Book>, patrons: List<Patron>, loans: List<Loan>, isbn: String, patron: String) -> Optional<String>:
+    define b_idx as find_book_index(books, isbn)
+    if b_idx < 0:
+        define err_msg as "Error: unknown book: " + isbn
+        return optional err_msg
+    define p_idx as find_patron_index(patrons, patron)
+    if p_idx < 0:
+        define err_msg as "Error: unknown patron: " + patron
+        return optional err_msg
+    define l_idx as find_loan_index(loans, isbn, patron)
+    if l_idx < 0:
+        define err_msg as "Error: no active loan for ISBN: " + isbn + " by patron: " + patron
+        return optional err_msg
+    return nothing
+
+function validate_renew(books: List<Book>, patrons: List<Patron>, loans: List<Loan>, holds: List<Hold>, isbn: String, patron: String) -> Optional<String>:
+    define b_idx as find_book_index(books, isbn)
+    if b_idx < 0:
+        define err_msg as "Error: unknown book: " + isbn
+        return optional err_msg
+    define p_idx as find_patron_index(patrons, patron)
+    if p_idx < 0:
+        define err_msg as "Error: unknown patron: " + patron
+        return optional err_msg
+    define l_idx as find_loan_index(loans, isbn, patron)
+    if l_idx < 0:
+        define err_msg as "Error: no active loan for ISBN: " + isbn + " by patron: " + patron
+        return optional err_msg
+    define h_count as count_holds_for_isbn(holds, isbn)
+    if h_count > 0:
+        define err_msg as "Error: cannot renew, hold queue is non-empty for ISBN: " + isbn
+        return optional err_msg
+    return nothing
+
+function validate_hold(books: List<Book>, patrons: List<Patron>, loans: List<Loan>, holds: List<Hold>, isbn: String, patron: String) -> Optional<String>:
+    define b_idx as find_book_index(books, isbn)
+    if b_idx < 0:
+        define err_msg as "Error: unknown book: " + isbn
+        return optional err_msg
+    define p_idx as find_patron_index(patrons, patron)
+    if p_idx < 0:
+        define err_msg as "Error: unknown patron: " + patron
+        return optional err_msg
+    if patron_has_hold(holds, isbn, patron):
+        define err_msg as "Error: patron already has hold on ISBN: " + isbn
+        return optional err_msg
+    return nothing

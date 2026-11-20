@@ -1,0 +1,42 @@
+# 01_catalog_test.meme -- catalog tests: add book, duplicate rejection, sorting, deletion constraints.
+
+use catalog
+
+test add_book_happy_path:
+    define books as empty List<Book>
+    define err as check_new_book(books, "978-0-14", "Dune", "Frank Herbert", 3)
+    assert err is nothing
+    define b as Book(isbn="978-0-14", title="Dune", author="Frank Herbert", copies=3)
+    add b to books
+    assert length of books == 1
+    assert find_book_index(books, "978-0-14") == 0
+
+test add_book_duplicate_rejected:
+    define books as empty List<Book>
+    define b as Book(isbn="978-0-14", title="Dune", author="Frank Herbert", copies=3)
+    add b to books
+    define err as check_new_book(books, "978-0-14", "Dune Messiah", "Frank Herbert", 2)
+    assert err is not nothing
+
+test catalog_sort_order:
+    define books as empty List<Book>
+    add Book(isbn="3", title="The Hobbit", author="Tolkien", copies=2) to books
+    add Book(isbn="1", title="1984", author="Orwell", copies=1) to books
+    add Book(isbn="4", title="Brave New World", author="Huxley", copies=3) to books
+    add Book(isbn="2", title="Animal Farm", author="Orwell", copies=4) to books
+    define sorted as sort_books_by_title(books)
+    assert length of sorted == 4
+    assert sorted[0].title == "1984"
+    assert sorted[1].title == "Animal Farm"
+    assert sorted[2].title == "Brave New World"
+    assert sorted[3].title == "The Hobbit"
+
+test can_delete_book_rules:
+    define books as empty List<Book>
+    add Book(isbn="978-1", title="Book 1", author="Author", copies=1) to books
+    define err_loans as can_delete_book(books, 1, "978-1")
+    assert err_loans is not nothing
+    define err_ok as can_delete_book(books, 0, "978-1")
+    assert err_ok is nothing
+    define err_unknown as can_delete_book(books, 0, "unknown-isbn")
+    assert err_unknown is not nothing

@@ -1,0 +1,40 @@
+# 06_persistence_test.meme -- persistence and error tolerance tests.
+
+use catalog
+use patron
+use circulation
+
+test persistence_missing_file_tolerance:
+    define b as load_books("data/missing_books.json")
+    assert length of b == 0
+    define p as load_patrons("data/missing_patrons.json")
+    assert length of p == 0
+    define l as load_loans("data/missing_loans.json")
+    assert length of l == 0
+    define h as load_holds("data/missing_holds.json")
+    assert length of h == 0
+
+test persistence_corrupt_file_tolerance:
+    create directory "data/test_tmp"
+    write file "data/test_tmp/corrupt.json" with "not valid json {["
+    define b as load_books("data/test_tmp/corrupt.json")
+    assert length of b == 0
+    define p as load_patrons("data/test_tmp/corrupt.json")
+    assert length of p == 0
+    define l as load_loans("data/test_tmp/corrupt.json")
+    assert length of l == 0
+    define h as load_holds("data/test_tmp/corrupt.json")
+    assert length of h == 0
+    delete file "data/test_tmp/corrupt.json"
+
+test persistence_roundtrip:
+    create directory "data/test_tmp"
+    define books as empty List<Book>
+    add Book(isbn="978-123", title="Test Book", author="Test Author", copies=5) to books
+    call save_books(books, "data/test_tmp/books_rt.json")
+    define loaded_books as load_books("data/test_tmp/books_rt.json")
+    assert length of loaded_books == 1
+    assert loaded_books[0].isbn == "978-123"
+    assert loaded_books[0].title == "Test Book"
+    assert loaded_books[0].copies == 5
+    delete file "data/test_tmp/books_rt.json"

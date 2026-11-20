@@ -1,0 +1,32 @@
+# 02_patron_test.meme -- patron tests: add patron, duplicate rejection, fine formatting.
+
+use patron
+
+test add_patron_happy_path:
+    define patrons as empty List<Patron>
+    define err as check_new_patron(patrons, "Alice")
+    assert err is nothing
+    define p as Patron(name="Alice", fines_cents=0)
+    add p to patrons
+    assert length of patrons == 1
+    assert find_patron_index(patrons, "Alice") == 0
+
+test add_patron_duplicate_rejected:
+    define patrons as empty List<Patron>
+    add Patron(name="Alice", fines_cents=0) to patrons
+    define err as check_new_patron(patrons, "Alice")
+    assert err is not nothing
+
+test dollars_text_formatting:
+    assert dollars_text(0) == "0.00"
+    assert dollars_text(5) == "0.05"
+    assert dollars_text(50) == "0.50"
+    assert dollars_text(500) == "5.00"
+    assert dollars_text(1234) == "12.34"
+    assert dollars_text(0 - 250) == "-2.50"
+
+test dollars_float_preview_shim:
+    define s1 as dollars_float_preview(5.0)
+    assert s1 == "5.00"
+    define s2 as dollars_float_preview(2.345)
+    assert s2 == "2.35"
