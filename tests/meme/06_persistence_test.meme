@@ -1,8 +1,10 @@
 # 06_persistence_test.meme -- persistence and error tolerance tests.
 
+# Leaf modules imported by bare name to match circulation.meme's own imports
+# (the compiler rejects one module file loaded under two names).
 use catalog
 use patron
-use circulation
+use ../../circulation
 
 test persistence_missing_file_tolerance:
     define b as load_books("data/missing_books.json")

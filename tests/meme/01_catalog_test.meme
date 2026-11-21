@@ -1,6 +1,6 @@
 # 01_catalog_test.meme -- catalog tests: add book, duplicate rejection, sorting, deletion constraints.
 
-use catalog
+use ../../catalog
 
 test add_book_happy_path:
     define books as empty List<Book>

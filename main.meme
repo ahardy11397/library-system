@@ -7,19 +7,19 @@ use patron
 use circulation
 
 function report_error(msg: String) -> Void:
-    append msg + "\n" to file "/dev/stderr"
+    print error msg
 
 function print_usage() -> Void:
-    append "Usage:" + "\n" to file "/dev/stderr"
-    append "  library add-book <isbn> <title> <author> <copies>" + "\n" to file "/dev/stderr"
-    append "  library add-patron <patron-name>" + "\n" to file "/dev/stderr"
-    append "  library checkout <isbn> <patron> <days-until-due>" + "\n" to file "/dev/stderr"
-    append "  library return <isbn> <patron>" + "\n" to file "/dev/stderr"
-    append "  library renew <isbn> <patron>" + "\n" to file "/dev/stderr"
-    append "  library hold <isbn> <patron>" + "\n" to file "/dev/stderr"
-    append "  library fines <patron>" + "\n" to file "/dev/stderr"
-    append "  library catalog" + "\n" to file "/dev/stderr"
-    append "  library patron <patron>" + "\n" to file "/dev/stderr"
+    print error "Usage:"
+    print error "  library add-book <isbn> <title> <author> <copies>"
+    print error "  library add-patron <patron-name>"
+    print error "  library checkout <isbn> <patron> <days-until-due>"
+    print error "  library return <isbn> <patron>"
+    print error "  library renew <isbn> <patron>"
+    print error "  library hold <isbn> <patron>"
+    print error "  library fines <patron>"
+    print error "  library catalog"
+    print error "  library patron <patron>"
 
 define books_path as "data/books.json"
 define patrons_path as "data/patrons.json"

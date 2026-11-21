@@ -1,6 +1,6 @@
 # 02_patron_test.meme -- patron tests: add patron, duplicate rejection, fine formatting.
 
-use patron
+use ../../patron
 
 test add_patron_happy_path:
     define patrons as empty List<Patron>

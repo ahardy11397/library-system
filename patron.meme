@@ -31,19 +31,7 @@ function check_new_patron(patrons: List<Patron>, name: String) -> Optional<Strin
     return nothing
 
 function dollars_text(cents: Int) -> String:
-    define mag as cents
-    define neg as cents < 0
-    if neg:
-        set mag to 0 - cents
-    define whole as mag / 100
-    define rem as mag % 100
-    define rem_text as text of rem
-    if rem < 10:
-        set rem_text to "0" + rem_text
-    define out as text of whole + "." + rem_text
-    if neg:
-        set out to "-" + out
-    return out
+    return format (float of cents / 100.0) with 2 decimals
 
 function dollars_float_preview(v: Float) -> String:
     return format v with 2 decimals

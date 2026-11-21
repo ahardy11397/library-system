@@ -8,7 +8,7 @@
 
 The application is structured into thin, cohesive modules:
 
-- **`main.meme`**: Thin CLI entry point. Routes command-line arguments (`argument count`, `argument <n>`), performs usage validation, and writes errors to `/dev/stderr` before exiting with status code `1`.
+- **`main.meme`**: Thin CLI entry point. Routes command-line arguments (`argument count`, `argument <n>`), performs usage validation, and writes errors to stderr via `print error` before exiting with status code `1`.
 - **`catalog.meme`**: Book record definition, JSON persistence (`read json records Book ... or else nothing`), lookup by ISBN, title-based sorting, and catalog constraints.
 - **`patron.meme`**: Patron record definition, JSON persistence, fine balance tracking, integer-cents money arithmetic, and exact dollar rendering.
 - **`circulation.meme`**: Active loans, hold queues (`Set<String>` membership), checkout validation with four distinct failure modes, overdue fine computation, renewal logic, and FIFO hold queue priority.

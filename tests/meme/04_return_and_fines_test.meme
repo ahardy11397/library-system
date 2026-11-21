@@ -1,9 +1,11 @@
 # 04_return_and_fines_test.meme -- return tests: on time, overdue, fine cap at $5.00, validation modes.
 
+# Leaf modules imported by bare name to match circulation.meme's own imports
+# (the compiler rejects one module file loaded under two names).
 use calendar
 use catalog
 use patron
-use circulation
+use ../../circulation
 
 test return_on_time_no_fine:
     define fine as calculate_overdue_fine(1000000, 900000)

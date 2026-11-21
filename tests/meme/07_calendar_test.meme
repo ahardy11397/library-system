@@ -1,6 +1,6 @@
 # 07_calendar_test.meme -- calendar arithmetic tests.
 
-use calendar
+use ../../calendar
 
 test leap_year_rules:
     assert is_leap_year(2000) == true

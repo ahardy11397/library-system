@@ -1,9 +1,11 @@
 # 05_holds_and_renew_test.meme -- renew and hold queue tests.
 
+# Leaf modules imported by bare name to match circulation.meme's own imports
+# (the compiler rejects one module file loaded under two names).
 use calendar
 use catalog
 use patron
-use circulation
+use ../../circulation
 
 test renew_happy_path:
     define books as empty List<Book>

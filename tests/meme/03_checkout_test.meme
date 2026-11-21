@@ -1,9 +1,13 @@
 # 03_checkout_test.meme -- checkout tests: happy path and all four failure modes.
 
+# Leaf modules are imported by bare name on purpose: circulation.meme imports
+# them the same way, and the compiler rejects loading one module file under
+# two names (e.g. `catalog` and `../../catalog`). circulation itself uses the
+# parent-relative form, so its symlink is not needed.
 use calendar
 use catalog
 use patron
-use circulation
+use ../../circulation
 
 test checkout_happy_path:
     define books as empty List<Book>
